@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NHL Live – Last Digit</title>
+<title>NHL – Schedule & Last Digit</title>
 <style>
 
 body {
@@ -25,6 +25,58 @@ h1 {
     text-align: center;
 
     font-size: 1.4rem;
+
+    margin-bottom: 6px;
+
+}
+
+h2 {
+
+    font-size: 1.1rem;
+
+    margin: 12px 0 6px;
+
+    border-bottom: 1px solid #334155;
+
+    padding-bottom: 4px;
+
+}
+
+.schedule {
+
+    background: #111827;
+
+    border-radius: 10px;
+
+    padding: 10px;
+
+    margin-bottom: 14px;
+
+}
+
+.schedule-game {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    font-size: 0.85rem;
+
+    padding: 6px 0;
+
+    border-bottom: 1px solid #1f2933;
+
+}
+
+.schedule-game:last-child {
+
+    border-bottom: none;
+
+}
+
+.network {
+
+    color: #93c5fd;
 
 }
 
@@ -80,8 +132,11 @@ h1 {
 </style>
 </head>
 <body>
-<h1>🏒 NHL Live – Last Digit</h1>
-<div id="games">Loading…</div>
+<h1>🏒 NHL Games</h1>
+<h2>Today’s Schedule (Pacific Time)</h2>
+<div class="schedule" id="schedule">Loading schedule…</div>
+<h2>Live Games – Last Digit</h2>
+<div id="games">Loading live games…</div>
 <script>
 
 const API_URL =
@@ -91,6 +146,22 @@ const API_URL =
 const POLL = 30000;
 
 const prev = {};
+
+function toPacificTime(isoString) {
+
+    const date = new Date(isoString);
+
+    return date.toLocaleTimeString("en-US", {
+
+        timeZone: "America/Los_Angeles",
+
+        hour: "numeric",
+
+        minute: "2-digit"
+
+    });
+
+}
 
 async function load() {
 
@@ -102,39 +173,29 @@ async function load() {
 
         const data = await res.json();
 
-        const container = document.getElementById("games");
+        const scheduleDiv = document.getElementById("schedule");
 
-        container.innerHTML = "";
+        const liveDiv = document.getElementById("games");
+
+        scheduleDiv.innerHTML = "";
+
+        liveDiv.innerHTML = "";
 
         if (!data.events || !data.events.length) {
 
-            container.innerText = "No NHL games today.";
+            scheduleDiv.innerText = "No NHL games today.";
+
+            liveDiv.innerText = "No live NHL games.";
 
             return;
 
         }
 
-        const live = data.events.filter(e =>
+        data.events.forEach(event => {
 
-            e.competitions &&
+            if (!event.competitions || !event.competitions[0]) return;
 
-            e.competitions[0] &&
-
-            e.competitions[0].status.type.state === "in"
-
-        );
-
-        if (!live.length) {
-
-            container.innerText = "No live NHL games.";
-
-            return;
-
-        }
-
-        live.forEach(e => {
-
-            const comp = e.competitions[0];
+            const comp = event.competitions[0];
 
             const teams = comp.competitors;
 
@@ -144,54 +205,90 @@ async function load() {
 
             const away = teams.find(t => t.homeAway === "away");
 
-            if (!home || !away) return;
+            const startTime = toPacificTime(event.date);
 
-            const totalScore =
+            const networks = comp.broadcasts && comp.broadcasts.length
 
-                parseInt(home.score || 0) +
+                ? comp.broadcasts.map(b => b.names.join(", ")).join(", ")
 
-                parseInt(away.score || 0);
+                : "TBD";
 
-            const digit = totalScore % 10;
+            // Schedule section (all games)
 
-            const div = document.createElement("div");
+            const schedRow = document.createElement("div");
 
-            div.className = "game";
+            schedRow.className = "schedule-game";
 
-            if (prev[e.id] !== undefined && prev[e.id] !== digit) {
+            schedRow.innerHTML = `
+<div>${away.team.abbreviation} @ ${home.team.abbreviation}</div>
+<div>${startTime} <span class="network">(${networks})</span></div>
 
-                div.classList.add("flash");
+            `;
 
-                setTimeout(() => div.classList.remove("flash"), 1500);
+            scheduleDiv.appendChild(schedRow);
 
-            }
+            // Live games section
 
-            prev[e.id] = digit;
+            if (comp.status.type.state === "in") {
 
-            div.innerHTML = `
+                const totalScore =
+
+                    parseInt(home.score || 0) +
+
+                    parseInt(away.score || 0);
+
+                const digit = totalScore % 10;
+
+                const gameDiv = document.createElement("div");
+
+                gameDiv.className = "game";
+
+                if (prev[event.id] !== undefined && prev[event.id] !== digit) {
+
+                    gameDiv.classList.add("flash");
+
+                    setTimeout(() => gameDiv.classList.remove("flash"), 1500);
+
+                }
+
+                prev[event.id] = digit;
+
+                gameDiv.innerHTML = `
 <div class="teams">
 
-                ${away.team.displayName} @ ${home.team.displayName}
+                        ${away.team.displayName} @ ${home.team.displayName}
 <div class="status">
 
-                  ${comp.status.type.shortDetail}
+                            ${comp.status.type.shortDetail}
 </div>
 </div>
 <div class="digit">${digit}</div>
 
-            `;
+                `;
 
-            container.appendChild(div);
+                liveDiv.appendChild(gameDiv);
+
+            }
 
         });
 
+        if (!liveDiv.innerHTML) {
+
+            liveDiv.innerText = "No live NHL games right now.";
+
+        }
+
     } catch (err) {
+
+        document.getElementById("schedule").innerText =
+
+            "Error loading NHL schedule.";
 
         document.getElementById("games").innerText =
 
-            "Error loading NHL scores.";
+            "Error loading live NHL games.";
 
-        console.error("NHL ERROR:", err);
+        console.error(err);
 
     }
 
