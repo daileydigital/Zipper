@@ -139,7 +139,7 @@ h2 {
 
 const API_URL =
 
-  "https://site.web.api.espn.com/apis/v2/sports/football/nfl/scoreboard";
+  "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
 const POLL = 30000;
 
@@ -177,7 +177,7 @@ async function load() {
 
         liveDiv.innerHTML = "";
 
-        if (!data.events || !data.events.length) {
+        if (!data.events?.length) {
 
             scheduleDiv.innerText = "No NFL games today.";
 
@@ -191,29 +191,25 @@ async function load() {
 
         data.events.forEach(event => {
 
-            const comp = event.competitions && event.competitions[0];
+            const comp = event.competitions?.[0];
 
             if (!comp) return;
 
-            const teams = comp.competitors;
+            const home = comp.competitors.find(t => t.homeAway === "home");
 
-            if (!teams || teams.length < 2) return;
-
-            const home = teams.find(t => t.homeAway === "home");
-
-            const away = teams.find(t => t.homeAway === "away");
+            const away = comp.competitors.find(t => t.homeAway === "away");
 
             if (!home || !away) return;
 
-            /* ---------- SCHEDULE ---------- */
+            // Schedule
 
             let networks = "TBD";
 
-            if (Array.isArray(comp.broadcasts) && comp.broadcasts.length) {
+            if (Array.isArray(comp.broadcasts)) {
 
                 networks = comp.broadcasts
 
-                    .map(b => b.name || (b.names && b.names.join(", ")))
+                    .map(b => b.name)
 
                     .filter(Boolean)
 
@@ -235,7 +231,7 @@ async function load() {
 
             scheduleDiv.appendChild(schedRow);
 
-            /* ---------- LIVE GAMES ---------- */
+            // Live games
 
             if (comp.status?.type?.state === "in") {
 
@@ -266,11 +262,8 @@ async function load() {
                 div.innerHTML = `
 <div class="teams">
 
-                        ${away.team.displayName} @ ${home.team.displayName}
-<div class="status">
-
-                            ${comp.status.type.shortDetail || ""}
-</div>
+                    ${away.team.displayName} @ ${home.team.displayName}
+<div class="status">${comp.status.type.shortDetail}</div>
 </div>
 <div class="digit">${digit}</div>
 
@@ -281,12 +274,6 @@ async function load() {
             }
 
         });
-
-        if (!scheduleDiv.innerHTML) {
-
-            scheduleDiv.innerText = "No NFL games today.";
-
-        }
 
         if (!hasLive) {
 
@@ -304,7 +291,7 @@ async function load() {
 
             "Error loading live NFL games.";
 
-        console.error("NFL ERROR:", err);
+        console.error("NFL FETCH ERROR:", err);
 
     }
 
