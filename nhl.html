@@ -88,9 +88,9 @@ const API_URL =
 
   "https://site.web.api.espn.com/apis/v2/sports/hockey/nhl/scoreboard";
 
-const POLL = 30000; // 30 seconds
+const POLL = 30000;
 
-const prev = {};   // gameId -> last digit
+const prev = {};
 
 async function load() {
 
@@ -98,13 +98,27 @@ async function load() {
 
         const res = await fetch(API_URL);
 
+        if (!res.ok) throw new Error("Network error");
+
         const data = await res.json();
 
         const container = document.getElementById("games");
 
         container.innerHTML = "";
 
+        if (!data.events || !data.events.length) {
+
+            container.innerText = "No NHL games today.";
+
+            return;
+
+        }
+
         const live = data.events.filter(e =>
+
+            e.competitions &&
+
+            e.competitions[0] &&
 
             e.competitions[0].status.type.state === "in"
 
@@ -124,9 +138,13 @@ async function load() {
 
             const teams = comp.competitors;
 
+            if (!teams || teams.length < 2) return;
+
             const home = teams.find(t => t.homeAway === "home");
 
             const away = teams.find(t => t.homeAway === "away");
+
+            if (!home || !away) return;
 
             const totalScore =
 
@@ -173,7 +191,7 @@ async function load() {
 
             "Error loading NHL scores.";
 
-        console.error(err);
+        console.error("NHL ERROR:", err);
 
     }
 
