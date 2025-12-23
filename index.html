@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zipper Board</title>
+<title>Sports Last Digit Board</title>
 <style>
 
 body {
@@ -155,13 +155,13 @@ h2 {
 <div class="tab" onclick="show('nhl')">🏒 NHL</div>
 </div>
 <div id="nfl">
-<h2>NFL Schedule (Pacific Time)</h2>
+<h2>NFL Schedule (Next 7 Days – PT)</h2>
 <div class="schedule" id="nflSchedule">Loading…</div>
 <h2>Live NFL – Last Digit</h2>
 <div id="nflLive">Loading…</div>
 </div>
 <div id="nhl" class="hidden">
-<h2>NHL Schedule (Pacific Time)</h2>
+<h2>NHL Schedule (Next 7 Days – PT)</h2>
 <div class="schedule" id="nhlSchedule">Loading…</div>
 <h2>Live NHL – Last Digit</h2>
 <div id="nhlLive">Loading…</div>
@@ -190,13 +190,19 @@ function show(id) {
 
 }
 
-function pacific(iso) {
+function pacificDate(iso) {
 
-    const d = new Date(iso);
+    return new Date(new Date(iso).toLocaleString("en-US", {
 
-    return d.toLocaleDateString("en-US", {
+        timeZone: "America/Los_Angeles"
 
-        timeZone: "America/Los_Angeles",
+    }));
+
+}
+
+function formatPacific(iso) {
+
+    return pacificDate(iso).toLocaleDateString("en-US", {
 
         weekday: "short",
 
@@ -205,6 +211,22 @@ function pacific(iso) {
         minute: "2-digit"
 
     });
+
+}
+
+function inNext7Days(date) {
+
+    const now = pacificDate(new Date());
+
+    const start = new Date(now.setHours(0,0,0,0));
+
+    const end = new Date(start);
+
+    end.setDate(end.getDate() + 6);
+
+    end.setHours(23,59,59,999);
+
+    return date >= start && date <= end;
 
 }
 
@@ -228,31 +250,45 @@ async function load(league) {
 
         data.events?.forEach(e => {
 
-            const c = e.competitions?.[0];
+            const comp = e.competitions?.[0];
 
-            if (!c) return;
+            if (!comp) return;
 
-            const h = c.competitors.find(t => t.homeAway === "home");
+            const gameDate = pacificDate(e.date);
 
-            const a = c.competitors.find(t => t.homeAway === "away");
+            if (!inNext7Days(gameDate)) return;
 
-            if (!h || !a) return;
+            const home = comp.competitors.find(t => t.homeAway === "home");
 
-            const nets = c.broadcasts?.map(b => b.name).filter(Boolean).join(", ") || "TBD";
+            const away = comp.competitors.find(t => t.homeAway === "away");
+
+            if (!home || !away) return;
+
+            const nets =
+
+                comp.broadcasts?.map(b => b.name).filter(Boolean).join(", ")
+
+                || "TBD";
+
+            // Schedule
 
             sched.innerHTML += `
 <div class="schedule-game">
-<div>${a.team.abbreviation} @ ${h.team.abbreviation}</div>
-<div>${pacific(e.date)} <span class="network">(${nets})</span></div>
+<div>${away.team.abbreviation} @ ${home.team.abbreviation}</div>
+<div>${formatPacific(e.date)}
+<span class="network">(${nets})</span>
+</div>
 </div>
 
             `;
 
-            if (c.status?.type?.state === "in") {
+            // Live
+
+            if (comp.status?.type?.state === "in") {
 
                 hasLive = true;
 
-                const digit = ((+h.score || 0) + (+a.score || 0)) % 10;
+                const digit = ((+home.score || 0) + (+away.score || 0)) % 10;
 
                 const key = league + e.id;
 
@@ -273,8 +309,8 @@ async function load(league) {
                 div.innerHTML = `
 <div>
 
-                    ${a.team.displayName} @ ${h.team.displayName}
-<div class="status">${c.status.type.shortDetail}</div>
+                    ${away.team.displayName} @ ${home.team.displayName}
+<div class="status">${comp.status.type.shortDetail}</div>
 </div>
 <div class="digit">${digit}</div>
 
@@ -286,15 +322,19 @@ async function load(league) {
 
         });
 
-        if (!sched.innerHTML) sched.innerText = "No games scheduled.";
+        if (!sched.innerHTML) sched.innerText = "No games in the next 7 days.";
 
         if (!hasLive) live.innerText = "No live games right now.";
 
     } catch {
 
-        document.getElementById(league + "Schedule").innerText = "Error loading schedule.";
+        document.getElementById(league + "Schedule").innerText =
 
-        document.getElementById(league + "Live").innerText = "Error loading live games.";
+            "Error loading schedule.";
+
+        document.getElementById(league + "Live").innerText =
+
+            "Error loading live games.";
 
     }
 
