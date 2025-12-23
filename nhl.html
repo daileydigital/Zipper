@@ -139,15 +139,25 @@ h2 {
 
 const API_URL =
 
-  "https://site.web.api.espn.com/apis/v2/sports/hockey/nhl/scoreboard";
+  "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard";
 
 const POLL = 30000;
 
 const prev = {};
 
-function toPacific(iso) {
+function formatPacific(iso) {
 
-    return new Date(iso).toLocaleTimeString("en-US", {
+    const d = new Date(iso);
+
+    const day = d.toLocaleDateString("en-US", {
+
+        timeZone: "America/Los_Angeles",
+
+        weekday: "short"
+
+    });
+
+    const time = d.toLocaleTimeString("en-US", {
 
         timeZone: "America/Los_Angeles",
 
@@ -156,6 +166,8 @@ function toPacific(iso) {
         minute: "2-digit"
 
     });
+
+    return `${day} ${time}`;
 
 }
 
@@ -177,7 +189,7 @@ async function load() {
 
         liveDiv.innerHTML = "";
 
-        if (!data.events || !data.events.length) {
+        if (!data.events?.length) {
 
             scheduleDiv.innerText = "No NHL games today.";
 
@@ -191,17 +203,13 @@ async function load() {
 
         data.events.forEach(event => {
 
-            const comp = event.competitions && event.competitions[0];
+            const comp = event.competitions?.[0];
 
             if (!comp) return;
 
-            const teams = comp.competitors;
+            const home = comp.competitors.find(t => t.homeAway === "home");
 
-            if (!teams || teams.length < 2) return;
-
-            const home = teams.find(t => t.homeAway === "home");
-
-            const away = teams.find(t => t.homeAway === "away");
+            const away = comp.competitors.find(t => t.homeAway === "away");
 
             if (!home || !away) return;
 
@@ -209,11 +217,11 @@ async function load() {
 
             let networks = "TBD";
 
-            if (Array.isArray(comp.broadcasts) && comp.broadcasts.length) {
+            if (Array.isArray(comp.broadcasts)) {
 
                 networks = comp.broadcasts
 
-                    .map(b => b.name || (b.names && b.names.join(", ")))
+                    .map(b => b.name)
 
                     .filter(Boolean)
 
@@ -227,7 +235,7 @@ async function load() {
 
             schedRow.innerHTML = `
 <div>${away.team.abbreviation} @ ${home.team.abbreviation}</div>
-<div>${toPacific(event.date)}
+<div>${formatPacific(event.date)}
 <span class="network">(${networks})</span>
 </div>
 
@@ -304,7 +312,7 @@ async function load() {
 
             "Error loading live NHL games.";
 
-        console.error("NHL ERROR:", err);
+        console.error("NHL FETCH ERROR:", err);
 
     }
 
