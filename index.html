@@ -3,106 +3,317 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zipper Last Digit NFL</title>
-
+<title>NFL – Schedule & Last Digit</title>
 <style>
+
 body {
+
     font-family: Arial, sans-serif;
+
     background: #0b132b;
+
     color: #f8f9fa;
+
     margin: 0;
+
     padding: 12px;
+
 }
+
 h1 {
+
     text-align: center;
+
     font-size: 1.4rem;
+
 }
-.game {
-    background: #1c2541;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
+
+h2 {
+
+    font-size: 1.1rem;
+
+    margin: 14px 0 6px;
+
+    border-bottom: 1px solid #334155;
+
+    padding-bottom: 4px;
+
+}
+
+.schedule {
+
+    background: #111827;
+
+    border-radius: 10px;
+
+    padding: 10px;
+
+    margin-bottom: 16px;
+
+}
+
+.schedule-game {
+
     display: flex;
+
     justify-content: space-between;
+
+    font-size: 0.85rem;
+
+    padding: 6px 0;
+
+    border-bottom: 1px solid #1f2933;
+
+}
+
+.schedule-game:last-child {
+
+    border-bottom: none;
+
+}
+
+.network {
+
+    color: #93c5fd;
+
+}
+
+.game {
+
+    background: #1c2541;
+
+    border-radius: 12px;
+
+    padding: 16px;
+
+    margin-bottom: 12px;
+
+    display: flex;
+
+    justify-content: space-between;
+
     align-items: center;
+
+    transition: background-color 0.6s;
+
 }
+
 .flash {
-    background: #2ec4b6 !important;
+
+    background: #fbbf24 !important;
+
     color: #0b132b;
+
 }
+
 .teams {
+
     font-size: 0.95rem;
+
 }
+
 .digit {
+
     font-size: 3rem;
+
     font-weight: bold;
+
 }
+
 .status {
+
     font-size: 0.8rem;
+
     color: #cbd5e1;
+
 }
 </style>
 </head>
-
 <body>
-
-<h1>🏈 NFL Live – Last Digit</h1>
-<div id="games">Loading…</div>
-
+<h1>🏈 NFL Games</h1>
+<h2>Today’s Schedule (Pacific Time)</h2>
+<div class="schedule" id="schedule">Loading schedule…</div>
+<h2>Live Games – Last Digit</h2>
+<div id="games">Loading live games…</div>
 <script>
+
 const API_URL =
+
   "https://site.web.api.espn.com/apis/v2/sports/football/nfl/scoreboard";
 
 const POLL = 30000;
+
 const prev = {};
 
+function toPacific(iso) {
+
+    return new Date(iso).toLocaleTimeString("en-US", {
+
+        timeZone: "America/Los_Angeles",
+
+        hour: "numeric",
+
+        minute: "2-digit"
+
+    });
+
+}
+
 async function load() {
-    const res = await fetch(API_URL);
-    const data = await res.json();
-    const container = document.getElementById("games");
-    container.innerHTML = "";
 
-    const live = data.events.filter(e =>
-        e.competitions[0].status.type.state === "in"
-    );
+    try {
 
-    if (!live.length) {
-        container.innerText = "No live games.";
-        return;
-    }
+        const res = await fetch(API_URL);
 
-    live.forEach(e => {
-        const c = e.competitions[0].competitors;
-        const h = c.find(t => t.homeAway === "home");
-        const a = c.find(t => t.homeAway === "away");
+        if (!res.ok) throw new Error("Network error");
 
-        const digit = ((+h.score) + (+a.score)) % 10;
+        const data = await res.json();
 
-        const div = document.createElement("div");
-        div.className = "game";
+        const scheduleDiv = document.getElementById("schedule");
 
-        if (prev[e.id] !== undefined && prev[e.id] !== digit) {
-            div.classList.add("flash");
-            setTimeout(() => div.classList.remove("flash"), 1500);
+        const liveDiv = document.getElementById("games");
+
+        scheduleDiv.innerHTML = "";
+
+        liveDiv.innerHTML = "";
+
+        if (!data.events || !data.events.length) {
+
+            scheduleDiv.innerText = "No NFL games today.";
+
+            liveDiv.innerText = "No live NFL games.";
+
+            return;
+
         }
 
-        prev[e.id] = digit;
+        let hasLive = false;
 
-        div.innerHTML = `
-          <div class="teams">
-            ${a.team.displayName} @ ${h.team.displayName}
-            <div class="status">${e.competitions[0].status.type.shortDetail}</div>
-          </div>
-          <div class="digit">${digit}</div>
-        `;
+        data.events.forEach(event => {
 
-        container.appendChild(div);
-    });
+            const comp = event.competitions && event.competitions[0];
+
+            if (!comp) return;
+
+            const teams = comp.competitors;
+
+            if (!teams || teams.length < 2) return;
+
+            const home = teams.find(t => t.homeAway === "home");
+
+            const away = teams.find(t => t.homeAway === "away");
+
+            if (!home || !away) return;
+
+            /* ---------- SCHEDULE ---------- */
+
+            let networks = "TBD";
+
+            if (Array.isArray(comp.broadcasts) && comp.broadcasts.length) {
+
+                networks = comp.broadcasts
+
+                    .map(b => b.name || (b.names && b.names.join(", ")))
+
+                    .filter(Boolean)
+
+                    .join(", ") || "TBD";
+
+            }
+
+            const schedRow = document.createElement("div");
+
+            schedRow.className = "schedule-game";
+
+            schedRow.innerHTML = `
+<div>${away.team.abbreviation} @ ${home.team.abbreviation}</div>
+<div>${toPacific(event.date)}
+<span class="network">(${networks})</span>
+</div>
+
+            `;
+
+            scheduleDiv.appendChild(schedRow);
+
+            /* ---------- LIVE GAMES ---------- */
+
+            if (comp.status?.type?.state === "in") {
+
+                hasLive = true;
+
+                const total =
+
+                    parseInt(home.score || 0) +
+
+                    parseInt(away.score || 0);
+
+                const digit = total % 10;
+
+                const div = document.createElement("div");
+
+                div.className = "game";
+
+                if (prev[event.id] !== undefined && prev[event.id] !== digit) {
+
+                    div.classList.add("flash");
+
+                    setTimeout(() => div.classList.remove("flash"), 1500);
+
+                }
+
+                prev[event.id] = digit;
+
+                div.innerHTML = `
+<div class="teams">
+
+                        ${away.team.displayName} @ ${home.team.displayName}
+<div class="status">
+
+                            ${comp.status.type.shortDetail || ""}
+</div>
+</div>
+<div class="digit">${digit}</div>
+
+                `;
+
+                liveDiv.appendChild(div);
+
+            }
+
+        });
+
+        if (!scheduleDiv.innerHTML) {
+
+            scheduleDiv.innerText = "No NFL games today.";
+
+        }
+
+        if (!hasLive) {
+
+            liveDiv.innerText = "No live NFL games right now.";
+
+        }
+
+    } catch (err) {
+
+        document.getElementById("schedule").innerText =
+
+            "Error loading NFL schedule.";
+
+        document.getElementById("games").innerText =
+
+            "Error loading live NFL games.";
+
+        console.error("NFL ERROR:", err);
+
+    }
+
 }
 
 load();
+
 setInterval(load, POLL);
 </script>
-
 </body>
 </html>
+ 
