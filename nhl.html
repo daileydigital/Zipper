@@ -26,15 +26,13 @@ h1 {
 
     font-size: 1.4rem;
 
-    margin-bottom: 6px;
-
 }
 
 h2 {
 
     font-size: 1.1rem;
 
-    margin: 12px 0 6px;
+    margin: 14px 0 6px;
 
     border-bottom: 1px solid #334155;
 
@@ -50,7 +48,7 @@ h2 {
 
     padding: 10px;
 
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 
 }
 
@@ -147,11 +145,9 @@ const POLL = 30000;
 
 const prev = {};
 
-function toPacificTime(isoString) {
+function toPacific(iso) {
 
-    const date = new Date(isoString);
-
-    return date.toLocaleTimeString("en-US", {
+    return new Date(iso).toLocaleTimeString("en-US", {
 
         timeZone: "America/Los_Angeles",
 
@@ -191,11 +187,13 @@ async function load() {
 
         }
 
+        let hasLive = false;
+
         data.events.forEach(event => {
 
-            if (!event.competitions || !event.competitions[0]) return;
+            const comp = event.competitions && event.competitions[0];
 
-            const comp = event.competitions[0];
+            if (!comp) return;
 
             const teams = comp.competitors;
 
@@ -205,15 +203,23 @@ async function load() {
 
             const away = teams.find(t => t.homeAway === "away");
 
-            const startTime = toPacificTime(event.date);
+            if (!home || !away) return;
 
-            const networks = comp.broadcasts && comp.broadcasts.length
+            /* ---------- SCHEDULE ---------- */
 
-                ? comp.broadcasts.map(b => b.names.join(", ")).join(", ")
+            let networks = "TBD";
 
-                : "TBD";
+            if (Array.isArray(comp.broadcasts) && comp.broadcasts.length) {
 
-            // Schedule section (all games)
+                networks = comp.broadcasts
+
+                    .map(b => b.name || (b.names && b.names.join(", ")))
+
+                    .filter(Boolean)
+
+                    .join(", ") || "TBD";
+
+            }
 
             const schedRow = document.createElement("div");
 
@@ -221,58 +227,68 @@ async function load() {
 
             schedRow.innerHTML = `
 <div>${away.team.abbreviation} @ ${home.team.abbreviation}</div>
-<div>${startTime} <span class="network">(${networks})</span></div>
+<div>${toPacific(event.date)}
+<span class="network">(${networks})</span>
+</div>
 
             `;
 
             scheduleDiv.appendChild(schedRow);
 
-            // Live games section
+            /* ---------- LIVE GAMES ---------- */
 
-            if (comp.status.type.state === "in") {
+            if (comp.status?.type?.state === "in") {
 
-                const totalScore =
+                hasLive = true;
+
+                const total =
 
                     parseInt(home.score || 0) +
 
                     parseInt(away.score || 0);
 
-                const digit = totalScore % 10;
+                const digit = total % 10;
 
-                const gameDiv = document.createElement("div");
+                const div = document.createElement("div");
 
-                gameDiv.className = "game";
+                div.className = "game";
 
                 if (prev[event.id] !== undefined && prev[event.id] !== digit) {
 
-                    gameDiv.classList.add("flash");
+                    div.classList.add("flash");
 
-                    setTimeout(() => gameDiv.classList.remove("flash"), 1500);
+                    setTimeout(() => div.classList.remove("flash"), 1500);
 
                 }
 
                 prev[event.id] = digit;
 
-                gameDiv.innerHTML = `
+                div.innerHTML = `
 <div class="teams">
 
                         ${away.team.displayName} @ ${home.team.displayName}
 <div class="status">
 
-                            ${comp.status.type.shortDetail}
+                            ${comp.status.type.shortDetail || ""}
 </div>
 </div>
 <div class="digit">${digit}</div>
 
                 `;
 
-                liveDiv.appendChild(gameDiv);
+                liveDiv.appendChild(div);
 
             }
 
         });
 
-        if (!liveDiv.innerHTML) {
+        if (!scheduleDiv.innerHTML) {
+
+            scheduleDiv.innerText = "No NHL games today.";
+
+        }
+
+        if (!hasLive) {
 
             liveDiv.innerText = "No live NHL games right now.";
 
@@ -288,7 +304,7 @@ async function load() {
 
             "Error loading live NHL games.";
 
-        console.error(err);
+        console.error("NHL ERROR:", err);
 
     }
 
