@@ -1,81 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Duff Zipper Board</title>
 <style>
-body {
-   font-family: Arial, sans-serif;
-   background: #0b132b;
-   color: #f8f9fa;
-   margin: 0;
-   padding: 12px;
-}
-.tabs {
-   display: flex;
-   justify-content: center;
-   margin-bottom: 12px;
-}
-.tab {
-   padding: 8px 16px;
-   margin: 0 4px;
-   border-radius: 8px;
-   background: #1c2541;
-   cursor: pointer;
-}
-.tab.active {
-   background: #2ec4b6;
-   color: #0b132b;
-}
-h2 {
-   font-size: 1.1rem;
-   margin: 14px 0 6px;
-   border-bottom: 1px solid #334155;
-   padding-bottom: 4px;
-}
-.schedule {
-   background: #111827;
-   border-radius: 10px;
-   padding: 10px;
-   margin-bottom: 16px;
-}
-.schedule-game {
-   display: flex;
-   justify-content: space-between;
-   font-size: 0.85rem;
-   padding: 6px 0;
-   border-bottom: 1px solid #1f2933;
-}
-.schedule-game:last-child {
-   border-bottom: none;
-}
-.network {
-   color: #93c5fd;
-}
-.game {
-   background: #1c2541;
-   border-radius: 12px;
-   padding: 16px;
-   margin-bottom: 12px;
-   display: flex;
-   justify-content: space-between;
-   align-items: center;
-   transition: background-color 0.6s;
-}
-.flash {
-   background: #fbbf24 !important;
-   color: #0b132b;
-}
-.digit {
-   font-size: 3rem;
-   font-weight: bold;
-}
-.status {
-   font-size: 0.8rem;
-   color: #cbd5e1;
-}
-.hidden { display: none; }
+body { font-family: Arial, sans-serif; background:#0b132b; color:#f8f9fa; margin:0; padding:12px; }
+.tabs{ display:flex; justify-content:center; margin-bottom:12px; }
+.tab{ padding:8px 16px; margin:0 4px; border-radius:8px; background:#1c2541; cursor:pointer; }
+.tab.active{ background:#2ec4b6; color:#0b132b; }
+h2{ font-size:1.1rem; margin:14px 0 6px; border-bottom:1px solid #334155; padding-bottom:4px; }
+.schedule{ background:#111827; border-radius:10px; padding:10px; margin-bottom:16px; }
+.schedule-game{ display:flex; justify-content:space-between; font-size:0.85rem; padding:6px 0; border-bottom:1px solid #1f2933; }
+.schedule-game:last-child{ border-bottom:none; }
+.network{ color:#93c5fd; }
+.game{ background:#1c2541; border-radius:12px; padding:16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; transition:background-color 0.6s; }
+.flash{ background:#fbbf24 !important; color:#0b132b; }
+.digit{ font-size:3rem; font-weight:bold; }
+.status{ font-size:0.8rem; color:#cbd5e1; }
+.hidden{ display:none; }
 </style>
 </head>
 <body>
@@ -84,125 +27,127 @@ h2 {
 <div class="tab" onclick="show('nhl')">🏒 NHL</div>
 </div>
 <div id="nfl">
-<h2>NFL Schedule (Next 7 Days – PT)</h2>
+<h2>NFL Schedule (Today + Next 6 Days – PT)</h2>
 <div class="schedule" id="nflSchedule">Loading…</div>
 <h2>Live NFL – Last Digit</h2>
 <div id="nflLive">Loading…</div>
 </div>
 <div id="nhl" class="hidden">
-<h2>NHL Schedule (Next 7 Days – PT)</h2>
+<h2>NHL Schedule (Today + Next 6 Days – PT)</h2>
 <div class="schedule" id="nhlSchedule">Loading…</div>
 <h2>Live NHL – Last Digit</h2>
 <div id="nhlLive">Loading…</div>
 </div>
 <script>
-const APIs = {
+const BASE = {
  nfl: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard",
  nhl: "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard"
 };
 const prev = {};
-function show(id) {
-   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-   document.querySelectorAll("#nfl,#nhl").forEach(d => d.classList.add("hidden"));
-   document.getElementById(id).classList.remove("hidden");
-   document.querySelector(`.tab[onclick="show('${id}')"]`).classList.add("active");
+function show(id){
+ document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+ document.querySelectorAll("#nfl,#nhl").forEach(d=>d.classList.add("hidden"));
+ document.getElementById(id).classList.remove("hidden");
+ document.querySelector(`.tab[onclick="show('${id}')"]`).classList.add("active");
 }
-// Convert any ISO date → Pacific Date object
-function pacificDateFromISO(iso) {
-   return new Date(
-       new Date(iso).toLocaleString("en-US", {
-           timeZone: "America/Los_Angeles"
-       })
-   );
+function pacificNowDateObj(){
+ return new Date(new Date().toLocaleString("en-US",{ timeZone:"America/Los_Angeles" }));
 }
-// Get Pacific "today at midnight"
-function pacificToday() {
-   const nowPT = new Date(
-       new Date().toLocaleString("en-US", {
-           timeZone: "America/Los_Angeles"
-       })
-   );
-   nowPT.setHours(0, 0, 0, 0);
-   return nowPT;
+function pacificMidnight(d){
+ const x = new Date(d);
+ x.setHours(0,0,0,0);
+ return x;
 }
-function inNext7Days(gameDatePT) {
-   const start = pacificToday();
-   const end = new Date(start);
-   end.setDate(end.getDate() + 6);
-   end.setHours(23, 59, 59, 999);
-   return gameDatePT >= start && gameDatePT <= end;
+function yyyymmdd(d){
+ const y = d.getFullYear();
+ const m = String(d.getMonth()+1).padStart(2,"0");
+ const day = String(d.getDate()).padStart(2,"0");
+ return `${y}${m}${day}`;
 }
-function formatPacific(iso) {
-   const d = pacificDateFromISO(iso);
-   return d.toLocaleDateString("en-US", {
-       weekday: "short",
-       hour: "numeric",
-       minute: "2-digit"
-   });
+function datesParamTodayPlus6(){
+ const startPT = pacificMidnight(pacificNowDateObj());
+ const endPT = new Date(startPT);
+ endPT.setDate(endPT.getDate()+6);
+ return `${yyyymmdd(startPT)}-${yyyymmdd(endPT)}`;
 }
-async function load(league) {
-   try {
-       const res = await fetch(APIs[league]);
-       const data = await res.json();
-       const sched = document.getElementById(league + "Schedule");
-       const live = document.getElementById(league + "Live");
-       sched.innerHTML = "";
-       live.innerHTML = "";
-       let hasLive = false;
-       data.events?.forEach(e => {
-           const comp = e.competitions?.[0];
-           if (!comp) return;
-           const gameDatePT = pacificDateFromISO(e.date);
-           if (!inNext7Days(gameDatePT)) return;
-           const home = comp.competitors.find(t => t.homeAway === "home");
-           const away = comp.competitors.find(t => t.homeAway === "away");
-           if (!home || !away) return;
-           const nets =
-               comp.broadcasts?.map(b => b.name).filter(Boolean).join(", ")
-               || "TBD";
-           // Schedule
-           sched.innerHTML += `
+function apiUrlWithDates(league){
+ const dates = datesParamTodayPlus6();
+ return `${BASE[league]}?dates=${dates}`;
+}
+function pacificDateFromISO(iso){
+ return new Date(new Date(iso).toLocaleString("en-US",{ timeZone:"America/Los_Angeles" }));
+}
+function formatPacificDayTime(iso){
+ const d = pacificDateFromISO(iso);
+ return d.toLocaleDateString("en-US",{
+   weekday:"short",
+   hour:"numeric",
+   minute:"2-digit"
+ });
+}
+async function load(league){
+ const sched = document.getElementById(league+"Schedule");
+ const live = document.getElementById(league+"Live");
+ try{
+   const res = await fetch(apiUrlWithDates(league));
+   if(!res.ok) throw new Error("Network error");
+   const data = await res.json();
+   sched.innerHTML = "";
+   live.innerHTML = "";
+   let hasLive = false;
+   const events = Array.isArray(data.events) ? data.events : [];
+   if(!events.length){
+     sched.innerText = "No games in the next 7 days.";
+     live.innerText = "No live games right now.";
+     return;
+   }
+   events.forEach(e=>{
+     const c = e.competitions?.[0];
+     if(!c) return;
+     const home = c.competitors?.find(t=>t.homeAway==="home");
+     const away = c.competitors?.find(t=>t.homeAway==="away");
+     if(!home || !away) return;
+     const nets = c.broadcasts?.map(b=>b.name).filter(Boolean).join(", ") || "TBD";
+     // schedule row
+     sched.innerHTML += `
 <div class="schedule-game">
 <div>${away.team.abbreviation} @ ${home.team.abbreviation}</div>
-<div>${formatPacific(e.date)}
-<span class="network">(${nets})</span>
+<div>${formatPacificDayTime(e.date)} <span class="network">(${nets})</span></div>
 </div>
-</div>
-           `;
-           // Live
-           if (comp.status?.type?.state === "in") {
-               hasLive = true;
-               const digit = ((+home.score || 0) + (+away.score || 0)) % 10;
-               const key = league + e.id;
-               const div = document.createElement("div");
-               div.className = "game";
-               if (prev[key] !== undefined && prev[key] !== digit) {
-                   div.classList.add("flash");
-                   setTimeout(() => div.classList.remove("flash"), 1500);
-               }
-               prev[key] = digit;
-               div.innerHTML = `
+     `;
+     // live last-digit
+     if(c.status?.type?.state === "in"){
+       hasLive = true;
+       const digit = ((+home.score || 0) + (+away.score || 0)) % 10;
+       const key = league + e.id;
+       const div = document.createElement("div");
+       div.className = "game";
+       if(prev[key] !== undefined && prev[key] !== digit){
+         div.classList.add("flash");
+         setTimeout(()=>div.classList.remove("flash"), 1500);
+       }
+       prev[key] = digit;
+       div.innerHTML = `
 <div>
-                   ${away.team.displayName} @ ${home.team.displayName}
-<div class="status">${comp.status.type.shortDetail}</div>
+           ${away.team.displayName} @ ${home.team.displayName}
+<div class="status">${c.status.type.shortDetail || ""}</div>
 </div>
 <div class="digit">${digit}</div>
-               `;
-               live.appendChild(div);
-           }
-       });
-       if (!sched.innerHTML) sched.innerText = "No games in the next 7 days.";
-       if (!hasLive) live.innerText = "No live games right now.";
-   } catch {
-       document.getElementById(league + "Schedule").innerText =
-           "Error loading schedule.";
-       document.getElementById(league + "Live").innerText =
-           "Error loading live games.";
-   }
+       `;
+       live.appendChild(div);
+     }
+   });
+   if(!sched.innerHTML) sched.innerText = "No games in the next 7 days.";
+   if(!hasLive) live.innerText = "No live games right now.";
+ } catch(err){
+   sched.innerText = "Error loading schedule.";
+   live.innerText = "Error loading live games.";
+   console.error(league.toUpperCase(), err);
+ }
 }
 load("nfl");
 load("nhl");
-setInterval(() => { load("nfl"); load("nhl"); }, 30000);
+setInterval(()=>{ load("nfl"); load("nhl"); }, 30000);
 </script>
 </body>
 </html>
